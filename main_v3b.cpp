@@ -5,7 +5,8 @@ basic 2d ball physics sim
 -improving thresholding to improve physics stability when as rest
 -adding onground state for balls
 -adding box
--adding aabb collision
+-adding aabb collision (box - box collision)
+-adding ball box collision
 */
 
 #include <SFML/Graphics.hpp>
@@ -238,7 +239,85 @@ public:
                     handleCollisionBox(boxes[i], boxes[j]);
                 }
             }
+
+            for (auto &ball : balls)
+            {
+                for (auto &box : boxes)
+                {
+                    handleCollisionBallBox(ball, box);
+                }
+            }
         }
+    }
+
+    void handleCollisionBallBox(Ball &ball, Box &box)
+    {
+        sf::Vector2f ballRelPos = ball.position - box.position; // position of ball wrt to box
+
+        // to find point on box closest to ball's center
+        sf::Vector2f closestBoxPoint = ballRelPos;
+
+        // clamping to find points on box
+        if (closestBoxPoint.x > box.halfSize.x)
+        {
+            closestBoxPoint.x = box.halfSize.x;
+        }
+        else if (closestBoxPoint.x < -box.halfSize.x)
+        {
+            closestBoxPoint.x = -box.halfSize.x;
+        }
+
+        if (closestBoxPoint.y > box.halfSize.y)
+        {
+            closestBoxPoint.y = box.halfSize.y;
+        }
+        else if (closestBoxPoint.y < -box.halfSize.y)
+        {
+            closestBoxPoint.y = -box.halfSize.y;
+        }
+
+        sf::Vector2f delta = ballRelPos - closestBoxPoint;
+        float distSq = delta.x * delta.x + delta.y * delta.y;
+
+        // no collision
+        if (distSq > ball.radius * ball.radius)
+            return;
+
+        // rare edge case where both are overlapping, we are dealing it by ignoring it
+        //  to prevent div by 0 err. alternatively we could push but meh.
+        if (distSq < 0.001f)
+            return;
+
+        float dist = sqrt(distSq);
+
+        float overlap = ball.radius - dist;
+
+        sf::Vector2f n = delta / dist; // normal vector from box to ball
+
+        if (n.y < -0.7 && box.onGround)
+        {
+            ball.onGround = true;
+        }
+        if (n.y > 0.9 && ball.onGround)
+        {
+            box.onGround = true;
+        }
+
+        // separation (static resolution)
+        float massSum = ball.mass + box.mass;
+        ball.position = ball.position + n * overlap * (box.mass / massSum);
+        box.position = box.position - n * overlap * (ball.mass / massSum);
+
+        // impulse transfer (dynamic resolution)
+        sf::Vector2f relVelBall = ball.velocity - box.velocity;
+        float relVelAlongN = relVelBall.x * n.x + relVelBall.y * n.y;
+        float e = 0.8f;
+        float j = -(1.0f + e) * relVelAlongN;
+        j /= (1.0f / ball.mass + 1.0f / box.mass);
+
+        sf::Vector2f impulse = j * n; // scalar -> vector
+        ball.velocity += impulse / ball.mass;
+        box.velocity -= impulse / box.mass;
     }
 
     void handleCollisionBox(Box &boxA, Box &boxB)
