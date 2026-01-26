@@ -7,6 +7,7 @@ basic 2d ball physics sim
 -adding box
 -adding aabb collision (box - box collision)
 -adding ball box collision
+-adding pause-play/step/reset/gravity toggle
 */
 
 #include <SFML/Graphics.hpp>
@@ -67,13 +68,25 @@ public:
     std::vector<Box> boxes;
     sf::Vector2u bounds;
 
-    const float GRAVITY = 1500.0f;
+    float OLD_GRAVITY = 0.0f;
+    float GRAVITY = 1500.0f;
     const float DAMPING = 0.85f;
     const int SUB_STEP = 8; // number of times updating physics for each ball, every frame
 
     World(unsigned int width, unsigned int height)
     {
         bounds = {width, height};
+    }
+
+    void reset()
+    {
+        balls.clear();
+        boxes.clear();
+    }
+
+    void toggleGravity()
+    {
+        std::swap(OLD_GRAVITY, GRAVITY);
     }
 
     void addBall(float x, float y, float radius)
@@ -537,6 +550,7 @@ int main()
     // fixed timestamp variable
     float accumulator = 0.0f;
     const float FIXED_TIMESTAMP = 1.0f / 60.0f; // 0.16s physics updates in interval of this time only
+    bool isPaused = false;
 
     while (window.isOpen())
     {
@@ -566,14 +580,39 @@ int main()
                     world.addBox(event.mouseButton.x, event.mouseButton.y, 60, 40);
                 }
             }
+            if (event.type == sf::Event::KeyPressed)
+            {
+                if (event.key.code == sf::Keyboard::Space)
+                {
+                    isPaused = !isPaused;
+                }
+                if (event.key.code == sf::Keyboard::S)
+                {
+                    if (isPaused)
+                    {
+                        world.update(FIXED_TIMESTAMP);
+                    }
+                }
+                if (event.key.code == sf::Keyboard::R)
+                {
+                    world.reset();
+                }
+                if (event.key.code == sf::Keyboard::G)
+                {
+                    world.toggleGravity();
+                }
+            }
         }
 
-        accumulator += dt;
         window.clear();
-        while (accumulator >= FIXED_TIMESTAMP)
+        if (!isPaused)
         {
-            world.update(FIXED_TIMESTAMP);
-            accumulator -= FIXED_TIMESTAMP;
+            accumulator += dt;
+            while (accumulator >= FIXED_TIMESTAMP)
+            {
+                world.update(FIXED_TIMESTAMP);
+                accumulator -= FIXED_TIMESTAMP;
+            }
         }
 
         renderWorld(window, world);
