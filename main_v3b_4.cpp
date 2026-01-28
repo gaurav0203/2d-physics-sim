@@ -505,6 +505,8 @@ public:
         sf::Vector2f relVelBall = ball.velocity - box.velocity;
         float relVelAlongN = relVelBall.x * n.x + relVelBall.y * n.y;
         float e = 0.8f;
+        if (std::abs(relVelAlongN) < 60.0f)
+            e = 0.0f;
         float j = -(1.0f + e) * relVelAlongN;
         j /= (1.0f / ball.mass + 1.0f / box.mass);
 
